@@ -83,6 +83,10 @@ stdenv.mkDerivation (finalAttrs: {
 
   doCheck = !stdenv.isDarwin;
 
+  postPatch = ''
+    sed 's/G_FILE_MONITOR_WATCH_HARD_LINKS/G_FILE_MONITOR_WATCH_HARD_LINKS, G_FILE_MONITOR_WATCH_MOVES/'
+  '';
+
   passthru.updateScript = gitUpdater { };
 
   meta = with lib; {
