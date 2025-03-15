@@ -7,6 +7,13 @@
 
 let
   inherit (lib)
+    isFloat
+    isInt
+    isBool
+    isString
+    isAttrs
+    optionals
+    traceSeq
     attrValues
     concatMapStringsSep
     concatStrings
@@ -16,10 +23,13 @@ let
     literalExpression
     mapAttrsToList
     mkEnableOption
+    mkPackageOption
     mkIf
     mkOption
     mkRemovedOptionModule
     optional
+    versionAtLeast
+    warn
     optionalAttrs
     optionalString
     singleton
@@ -34,6 +44,31 @@ let
 
   cfg = config.services.dovecot2;
   dovecotPkg = pkgs.dovecot;
+
+  ### >=2.4 config
+
+  yesOrNo = v: if v then "yes" else "no";
+
+  toOption =
+    i: n: v:
+    "${i}${toString n} = ${v}";
+
+  toDoveConf =
+    indent: n: v:
+    if isInt v then
+      (toOption indent n (toString v))
+    else if isBool v then
+      (toOption indent n (yesOrNo v))
+    else if isString v then
+      (toOption indent n v)
+    else if isAttrs v then
+      (concatStringsSep "\n" (
+        [ "${indent}${n} {" ] ++ (mapAttrsToList (toDoveConf "${indent}  ") v) ++ [ "${indent}}" ]
+      ))
+    else
+      throw (traceSeq v "services.dovecot2.settings: unexpected type");
+
+  ### <=2.3 config
 
   baseDir = "/run/dovecot2";
   stateDir = "/var/lib/dovecot";
@@ -287,6 +322,94 @@ in
 
   options.services.dovecot2 = {
     enable = mkEnableOption "the dovecot 2.x POP3/IMAP server";
+
+    package = mkPackageOption pkgs "dovecot" { example = "dovecot_2_4"; };
+
+    settings =
+      let
+        sectionType = lib.types.submodule (
+          { name, ... }:
+          {
+            options = {
+              section.type = mkOption {
+                type = lib.types.str;
+              };
+              section.name = mkOption {
+                type = lib.types.str;
+                default = "";
+              };
+            };
+            config = {
+              # parse 'name' if possible
+              section.type = "";
+              section.name = "";
+            };
+            freeformType = settingsType;
+          }
+        );
+        atom =
+          with lib.types;
+          oneOf [
+            int
+            str
+            bool
+            sectionType
+          ];
+        settingsType = with lib.types; either atom (listOf atom);
+      in
+      mkOption {
+        default = { };
+        type = lib.types.attrsOf settingsType;
+        description = ''
+          Dovecot configuration, see <https://doc.dovecot.org/2.4.0/core/summaries/settings.html#all-dovecot-settings>
+          for all available options.
+        '';
+        example = literalExpression ''
+          {
+            base_dir = "/run/dovecot";
+            state_dir = "/run/dovecot";
+            protocols = "imap submission lmtp";
+            mail_driver = "maildir";
+            mail_path = "~/mail";
+            mail_uid = "vmail";
+            mail_gid = "vmail";
+            mail_log_events = "delete undelete expunge save copy mailbox_create mailbox_delete mailbox_rename flag_change";
+
+            "namespace inbox" = {
+              inbox = "yes";
+              separator = "/";
+            };
+
+            ssl_server = {
+              cert_file = "/etc/dovecot/ssl/tls.crt";
+              key_file = "/etc/dovecot/ssl/tls.key";
+            };
+
+            mail_attribute."dict file" = {
+              path = "%{home}/dovecot-attributes";
+            };
+
+            mail_plugins = {
+              fts = "yes";
+              fts_flatcurve = "yes";
+              mail_log = "yes";
+              notify = "yes";
+            };
+
+            "protocol imap".mail_plugins = {
+              imap_sieve = "yes";
+              imap_filter_sieve = "yes";
+            };
+
+            "service imap-login" = {
+              process_min_avail = 1;
+              client_limit = 100;
+              "inet_listener imap".port = 31143;
+              "inet_listener imaps".port = 31993;
+            };
+          }
+        '';
+      };
 
     enablePop3 = mkEnableOption "starting the POP3 listener (when Dovecot is enabled)";
 
@@ -623,6 +746,21 @@ in
   };
 
   config = mkIf cfg.enable {
+    services.dovecot2 = {
+      package = lib.mkDefault (
+        if versionAtLeast config.system.stateVersion "25.05" then # TODO adjust this if we don't get in in time for 25.05
+          pkgs.dovecot_2_4
+        else
+          warn ''
+            While Dovecot 2.3 is not yet deprecated or EOL,
+            there is a newer version available in Nixpkgs (Dovecot 2.4).
+            Do note that this version has breaking changes to the config
+            format, see https://doc.dovecot.org/2.4.0/installation/upgrade/2.3-to-2.4.html
+            for an overview.'' pkgs.dovecot_2_3
+      );
+      settings = { }; # TODO some sane defaults
+    };
+
     security.pam.services.dovecot2 = mkIf cfg.enablePAM { };
 
     security.dhparams = mkIf (cfg.sslServerCert != null && cfg.enableDHE) {
