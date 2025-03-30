@@ -1277,6 +1277,18 @@
   "module-services-tandoor-recipes-migrating-media": [
     "index.html#module-services-tandoor-recipes-migrating-media"
   ],
+  "module-services-spliit": [
+    "index.html#module-services-spliit"
+  ],
+  "module-services-spliit-basic-usage": [
+    "index.html#module-services-spliit-basic-usage"
+  ],
+  "module-services-spliit-external-database": [
+    "index.html#module-services-spliit-external-database"
+  ],
+  "module-services-spliit-extra-config-and-secrets": [
+    "index.html#module-services-spliit-extra-config-and-secrets"
+  ],
   "module-services-litestream": [
     "index.html#module-services-litestream"
   ],
