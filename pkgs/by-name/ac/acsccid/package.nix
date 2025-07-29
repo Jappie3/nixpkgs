@@ -49,6 +49,10 @@ stdenv.mkDerivation (finalAttrs: {
 
   doCheck = true;
 
+  postUnpack = ''
+    cp -v ${gettext}/share/gettext/m4/lib-{link,prefix,ld}.m4 source/m4
+  '';
+
   postPatch = ''
     sed -e s_/bin/echo_echo_g -i src/Makefile.am
     patchShebangs src/convert_version.pl
