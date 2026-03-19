@@ -8105,7 +8105,9 @@ with pkgs;
   };
 
   dovecot_pigeonhole_0_5 = dovecot_pigeonhole;
-  dovecot_pigeonhole_2_4 = callPackage ../by-name/do/dovecot_pigeonhole/2.4.nix { };
+  dovecot_pigeonhole_2_4 = callPackage ../by-name/do/dovecot_pigeonhole/2.4.nix {
+    dovecot = dovecot_2_4;
+  };
   dovecot_pigeonhole = callPackage ../by-name/do/dovecot_pigeonhole/package.nix {
     dovecot = dovecot_2_3;
   };
